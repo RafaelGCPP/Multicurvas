@@ -7,8 +7,9 @@
 **Fases planejadas**:
 1. ✅ Tokenização + Validação
 2. ✅ Conversão para RPN (Shunting Yard)
-3. ⏳ Avaliador de RPN
-4. ⏳ Interface de plotagem
+3. ✅ Avaliador de RPN
+4. ⏳ Benchmark e Validação (ODE hardcoded vs parseada)
+5. ⏳ Interface de plotagem
 
 ---
 
@@ -320,6 +321,74 @@ extern LocaleConfig parser_locale;  /* Configuração global no parser.c */
 
 ---
 
+### `evaluator.h` / `evaluator.c`
+
+**Responsabilidade**: Avaliar expressões em RPN (Reverse Polish Notation) e calcular resultados numéricos.
+
+#### Tipos Customizados
+
+##### `enum EvalError`
+```c
+typedef enum {
+    EVAL_OK = 0,
+    EVAL_STACK_ERROR,           /* Pilha vazia ou múltiplos valores no final */
+    EVAL_DIVISION_BY_ZERO,      /* Divisão por zero */
+    EVAL_DOMAIN_ERROR,          /* Domínio inválido */
+    EVAL_MATH_ERROR             /* Overflow, NaN */
+} EvalError;
+```
+- **Finalidade**: Identificar tipo de erro durante avaliação
+- **EVAL_DIVISION_BY_ZERO**: Separado para permitir estratégias especiais (limite, stencil, marcar descontinuidade)
+- **EVAL_DOMAIN_ERROR**: sqrt negativo, log≤0, asin/acos fora de [-1,1], etc.
+
+##### `struct EvalResult`
+```c
+typedef struct {
+    EvalError error;
+    double value;
+} EvalResult;
+```
+- **Finalidade**: Retornar resultado e status de erro
+- **value**: Válido apenas se `error == EVAL_OK`
+
+#### Funções
+
+##### `EvalResult evaluator_eval_rpn(const TokenBuffer *rpn, double var_value)`
+- **Objetivo**: Avaliar expressão RPN com valor para a variável
+- **Entrada**:
+  - `rpn` (const TokenBuffer*): Expressão em RPN
+  - `var_value` (double): Valor para x, theta ou t
+- **Saída**: `EvalResult` (erro + valor)
+- **Algoritmo**:
+  1. Cria pilha de doubles
+  2. Para cada token:
+     - Número → empilha value
+     - Variável → empilha var_value
+     - Constante (pi, e) → empilha valor
+     - Operador → desempilha 2, calcula, empilha
+     - Função → desempilha 1, calcula, empilha
+  3. Retorna valor final (deve sobrar exatamente 1 na pilha)
+- **Exemplo**:
+  ```c
+  TokenBuffer rpn;
+  parser_tokenize("sin(x)*2+1", &tokens);
+  parser_to_rpn(&tokens, &rpn);
+  
+  EvalResult result = evaluator_eval_rpn(&rpn, 1.0);  // x=1
+  if (result.error == EVAL_OK) {
+      printf("Resultado: %g\n", result.value);  // 2.68294
+  }
+  ```
+- **Funções suportadas** (19 total):
+  - Trigonométricas: sin, cos, tan
+  - Inversas: asin, acos, atan
+  - Hiperbólicas: sinh, cosh, tanh
+  - Hiperbólicas inversas: asinh, acosh, atanh
+  - Logaritmos: log (ln), log10
+  - Outras: abs, sqrt, ceil, floor, frac
+
+---
+
 ### `main.c`
 
 **Responsabilidade**: Programa de teste/protótipo que demonstra o parser em ação.
@@ -458,15 +527,22 @@ x          → [1.916, 5]
 - [x] Suporte a associatividade (^ é associativo à direita)
 - [x] Suporte a funções
 
-### Fase 3: Avaliação ⏳
-- [ ] Avaliador de RPN
-- [ ] Substituição de variáveis
-- [ ] Cálculo de constantes
-- [ ] Tratamento de erros matemáticos
+### Fase 3: Avaliação ✅
+- [x] Avaliador de RPN (pilha de doubles)
+- [x] Substituição de variáveis
+- [x] Cálculo de constantes (pi, e)
+- [x] Tratamento de erros matemáticos (divisão por zero, domínio, overflow)
+- [x] 19 funções implementadas
 
-### Fase 4: Interface ⏳
-- [ ] Plotagem de gráficos
-- [ ] Interface CLI/GUI
+### Fase 4: Benchmark e Validação ⏳
+- [ ] Comparar performance: ODE hardcoded vs parseada
+- [ ] Método de Euler para teste
+- [ ] Validação numérica
+
+### Fase 5: Interface de Plotagem ⏳
+- [ ] Plotagem de gráficos 2D
+- [ ] Coordenadas retangulares, polares, paramétricas
+- [ ] Detecção de descontinuidades
 
 ---
 

@@ -14,11 +14,12 @@ Implementar um sistema que permita:
 
 ### ✅ Fase 1: Tokenização (Completa)
 - Operadores: `+`, `-`, `*`, `/`, `^`
-- Funções: `sin()`, `cos()`, `tan()`, `abs()`, `sqrt()`
+- **19 Funções**: `sin`, `cos`, `tan`, `abs`, `sqrt`, `log`, `log10`, `sinh`, `cosh`, `tanh`, `asin`, `acos`, `atan`, `asinh`, `acosh`, `atanh`, `ceil`, `floor`, `frac`
 - Constantes: `pi`, `e`
 - Variáveis: `x`, `theta`, `t`
 - Parênteses balanceados
 - Suporte a locale (ponto ou vírgula decimal)
+- Sistema de ranges para extensibilidade (10 variáveis, 20 constantes, 40 funções)
 
 ### ✅ Fase 2: RPN (Completa)
 - Algoritmo Shunting Yard de Dijkstra
@@ -26,12 +27,27 @@ Implementar um sistema que permita:
 - Associatividade (^ à direita, outros à esquerda)
 - Suporte a funções
 
-### ⏳ Fase 3: Avaliação
-- Avaliador de RPN
-- Cálculo com valores de variáveis
+### ✅ Fase 3: Avaliação (Completa)
+- Avaliador de RPN com pilha de doubles
+- Suporte a todas as 19 funções matemáticas
+- Tratamento específico de erros:
+  - `EVAL_DIVISION_BY_ZERO` - permite estratégias de limite/stencil
+  - `EVAL_DOMAIN_ERROR` - domínio inválido (sqrt negativo, log≤0, etc.)
+  - `EVAL_MATH_ERROR` - overflow, NaN
+  - `EVAL_STACK_ERROR` - expressão mal-formada
+- Substituição de variáveis em tempo de avaliação
 
-### ⏳ Fase 4: Interface
-- Plotagem de gráficos
+### ⏳ Próximos Passos
+
+#### Fase 4: Benchmark e Validação
+- Comparar desempenho: ODE hardcoded vs parseada (método de Euler)
+- Validar precisão numérica
+- Testes de performance
+
+#### Fase 5: Interface de Plotagem
+- Plotagem de gráficos 2D
+- Suporte a coordenadas retangulares, polares e paramétricas
+- Detecção de descontinuidades (divisão por zero)
 
 ## 🚀 Quick Start
 
