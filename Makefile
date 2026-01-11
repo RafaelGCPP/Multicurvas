@@ -1,36 +1,61 @@
+
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -I./include -lm -O3
+CFLAGS = -Wall -Wextra -std=c99 -I./include
+LDFLAGS = -L$(BUILDDIR) -lmulticurvas -lm
+
+
 SRCDIR = src
 BUILDDIR = build
-TARGET = $(BUILDDIR)/multicurvas
-BENCHMARK_TARGET = $(BUILDDIR)/benchmark
+TESTDIR = test
+LIBNAME = libmulticurvas.a
+LIBPATH = $(BUILDDIR)/$(LIBNAME)
 
-# Arquivos comuns (excluindo os mains)
-COMMON_SOURCES = $(SRCDIR)/parser.c $(SRCDIR)/evaluator.c $(SRCDIR)/debug.c
-COMMON_OBJECTS = $(patsubst $(SRCDIR)/%.c, $(BUILDDIR)/%.o, $(COMMON_SOURCES))
+
+SOURCES = $(wildcard $(SRCDIR)/*.c)
+OBJECTS = $(patsubst $(SRCDIR)/%.c, $(BUILDDIR)/%.o, $(SOURCES))
+TEST_SOURCES = $(wildcard $(TESTDIR)/*.c)
+TEST_BINS = $(patsubst $(TESTDIR)/%.c, $(BUILDDIR)/%.test, $(TEST_SOURCES))
 
 # Objetos específicos dos executáveis
 MAIN_OBJECTS = $(BUILDDIR)/main.o
 BENCHMARK_OBJECTS = $(BUILDDIR)/main_benchmark.o $(BUILDDIR)/benchmark.o
 
-all: $(TARGET) $(BENCHMARK_TARGET)
+all: library tests run-tests
 
-$(TARGET): $(COMMON_OBJECTS) $(MAIN_OBJECTS)
-	$(CC) $^ -o $@ $(CFLAGS)
+library: $(LIBPATH)
 
-$(BENCHMARK_TARGET): $(COMMON_OBJECTS) $(BENCHMARK_OBJECTS)
-	$(CC) $^ -o $@ $(CFLAGS)
+$(LIBPATH): $(OBJECTS)
+	ar rcs $@ $^
 
-$(BUILDDIR)/%.o: $(SRCDIR)/%.c
+
+$(BUILDDIR)/%.test: $(TESTDIR)/%.c $(LIBPATH) | $(BUILDDIR)
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
+
+$(BUILDDIR)/%.o: $(SRCDIR)/%.c | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
+
 clean:
-	rm -rf $(BUILDDIR)/*.o $(TARGET) $(BENCHMARK_TARGET)
+	rm -rf $(BUILDDIR)
 
-run: $(TARGET)
-	./$(TARGET)
+# Target para compilar todos os testes
+tests: $(TEST_BINS)
 
-benchmark: $(BENCHMARK_TARGET)
-	./$(BENCHMARK_TARGET)
+# Target para rodar todos os testes
+run-tests: tests
+	@for t in $(TEST_BINS); do echo "Executando $$t:"; $$t; done
 
-.PHONY: all clean run benchmark
+.PHONY: all clean help tests run-tests
+
+
+
+help:
+	@echo "Targets disponíveis:"
+	@echo "  all         - Compila a biblioteca, os testes e executa todos os binários de teste."
+	@echo "  library     - Compila apenas a biblioteca estática (.a)."
+	@echo "  tests       - Compila um executável para cada arquivo .c em test/."
+	@echo "  run-tests   - Executa todos os binários de teste."
+	@echo "  clean       - Remove arquivos gerados e diretório build."
+	@echo "  help        - Mostra esta mensagem de ajuda."

@@ -88,8 +88,8 @@ static void test_expression(const char *expr) {
 
 int main(void) {
     printf("╔═══════════════════════════════════════════════════════════╗\n");
-    printf("║    MULTICURVAS - Parser de Expressões Matemáticas        ║\n");
-    printf("║              Fase 1: Tokenizador + RPN                   ║\n");
+    printf("║     MULTICURVAS - Parser de Expressões Matemáticas        ║\n");
+    printf("║               Fase 1: Tokenizador + RPN                   ║\n");
     printf("╚═══════════════════════════════════════════════════════════╝\n");
     
     /* TESTE 1: Com locale POINT (padrão) */
