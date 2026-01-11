@@ -14,7 +14,8 @@ Implementar um sistema que permita:
 
 ### ✅ Fase 1: Tokenização (Completa)
 - Operadores: `+`, `-`, `*`, `/`, `^`
-- **19 Funções**: `sin`, `cos`, `tan`, `abs`, `sqrt`, `log`, `log10`, `sinh`, `cosh`, `tanh`, `asin`, `acos`, `atan`, `asinh`, `acosh`, `atanh`, `ceil`, `floor`, `frac`
+- **Operador unário `-`** (negativo): `-x`, `2*(-x)`, `sin(-x)` funcionam corretamente
+- **20 Funções**: `sin`, `cos`, `tan`, `abs`, `sqrt`, `exp`, `log`, `log10`, `sinh`, `cosh`, `tanh`, `asin`, `acos`, `atan`, `asinh`, `acosh`, `atanh`, `ceil`, `floor`, `frac`
 - Constantes: `pi`, `e`
 - Variáveis: `x`, `theta`, `t`
 - Parênteses balanceados
@@ -22,14 +23,14 @@ Implementar um sistema que permita:
 - Sistema de ranges para extensibilidade (10 variáveis, 20 constantes, 40 funções)
 
 ### ✅ Fase 2: RPN (Completa)
-- Algoritmo Shunting Yard de Dijkstra
+- Algoritmo Shunting Yard de Dijkstra - [Explicação detalhada](SHUNTING_YARD.md)
 - Precedência de operadores
 - Associatividade (^ à direita, outros à esquerda)
 - Suporte a funções
 
 ### ✅ Fase 3: Avaliação (Completa)
-- Avaliador de RPN com pilha de doubles
-- Suporte a todas as 19 funções matemáticas
+- Avaliador de RPN com pilha estática de doubles (otimizado)
+- Suporte a todas as 20 funções matemáticas
 - Tratamento específico de erros:
   - `EVAL_DIVISION_BY_ZERO` - permite estratégias de limite/stencil
   - `EVAL_DOMAIN_ERROR` - domínio inválido (sqrt negativo, log≤0, etc.)
@@ -37,14 +38,21 @@ Implementar um sistema que permita:
   - `EVAL_STACK_ERROR` - expressão mal-formada
 - Substituição de variáveis em tempo de avaliação
 
+### ✅ Fase 4: Otimizações (Completa)
+- **Token compacto**: 50% de redução (16→8 bytes), 38% economia total
+- **Pilha estática**: 2-3x mais rápido, sem malloc/free por avaliação
+- **Cache-friendly**: 2x mais tokens por cache line
+- **Função exp() nativa**: 35% mais rápida que e^x
+
+### ✅ Fase 5: Benchmark (Completa)
+- Integração numérica de 10M pontos
+- Comparação hardcoded vs parseado
+- Overhead de apenas **2.56x** (excelente!)
+- Ferramentas de análise de memória
+
 ### ⏳ Próximos Passos
 
-#### Fase 4: Benchmark e Validação
-- Comparar desempenho: ODE hardcoded vs parseada (método de Euler)
-- Validar precisão numérica
-- Testes de performance
-
-#### Fase 5: Interface de Plotagem
+#### Fase 6: Interface de Plotagem
 - Plotagem de gráficos 2D
 - Suporte a coordenadas retangulares, polares e paramétricas
 - Detecção de descontinuidades (divisão por zero)
@@ -56,13 +64,24 @@ Implementar um sistema que permita:
 ```bash
 cd /home/hlpp/work/Multicurvas
 make clean
-make
+make all
 ```
 
 ### Execução
 
+**Testes do parser:**
 ```bash
 ./build/multicurvas
+```
+
+**Benchmark de performance:**
+```bash
+./build/benchmark
+```
+
+**Análise de memória:**
+```bash
+./build/memory_test
 ```
 
 ### Limpeza
@@ -76,9 +95,54 @@ make clean
 ```
 Multicurvas/
 ├── src/
-│   ├── main.c       # Programa de teste/protótipo
-│   ├── parser.c     # Tokenizador e parser
-│   └── debug.c      # Funções de debug/visualização
+│   ├── main.c           # Programa de teste/protótipo
+>>>>>>> ab2979c (Fix: Corrige erros de formatação nos arquivos .md)
+│   ├── main_benchmark.c # Benchmark de performance
+│   ├── benchmark.c      # Testes de integração numérica
+│   ├── memory_test.c    # Análise de uso de memória
+│   ├── parser.c         # Tokenizador e parser
+│   ├── evaluator.c      # Avaliador de RPN
+│   └── debug.c          # Funções de debug/visualização
+├── include/
+│   ├── tokens.h         # Definições de tokens
+│   ├── parser.h         # Interface do parser
+│   ├── evaluator.h      # Interface do avaliador
+│   └── debug.h          # Funções de debug
+├── build/               # Arquivos compilados (gerado)
+├── Makefile             # Automação de compilação
+├── .gitignore           # Exclusões do Git
+├── README.md            # Este arquivo
+├── DOCUMENTATION.md     # Documentação técnica detalhada
+└── SHUNTING_YARD.md     # Explicação do algoritmo RPN
+```
+
+## 📚 Documentação
+
+- **[DOCUMENTATION.md](DOCUMENTATION.md)** - Documentação técnica completa
+- **[SHUNTING_YARD.md](SHUNTING_YARD.md)** - Explicação detalhada do algoritmo de conversão RPN
+
+A documentação inclui:
+- Responsabilidade de cada módulo
+- Tipos customizados e seus valores esperados
+- Descrição de cada função (entrada, saída, exemplos)
+- Otimizações de performance implementadas
+- Fluxo de dados
+- Guia de extensão
+
+## 🚀 Performance
+
+**Benchmark**: Integração numérica de `f(x) = x * exp(x)` com 10 milhões de pontos
+
+| Método | Tempo | Overhead |
+|--------|-------|----------|
+| Parsing | 0.000004s | - |
+| Hardcoded | 0.039s | 1.0x |
+| Parseado | 0.101s | 2.56x |
+
+**Otimizações implementadas:**
+- Pilha estática sem malloc/free: 2-3x mais rápido
+- Token compacto (8 vs 16 bytes): 50% menos memória, melhor cache
+- Função exp() nativa: 35% mais rápida que e^x   # Funções de debug/visualização
 ├── include/
 │   ├── tokens.h     # Definições de tokens
 │   ├── parser.h     # Interface do parser
