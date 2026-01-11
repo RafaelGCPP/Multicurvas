@@ -76,7 +76,7 @@ Implementar um sistema que permita:
 ./build/memory_test
 make
 ```
-    # Programa de teste/protótipo
+# Programa de teste/protótipo
 │   ├── main_benchmark.c # Benchmark de performance
 │   ├── benchmark.c      # Testes de integração numérica
 │   ├── memory_test.c    # Análise de uso de memória
