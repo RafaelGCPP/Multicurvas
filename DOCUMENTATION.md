@@ -363,14 +363,10 @@ typedef enum {
 ##### `struct EvalResult`
 ```c
 typedef struct {
-    Otimização**: Usa pilha **estática** de 64 níveis (sem malloc/free por avaliação)
-  - Overhead: ~512 bytes na stack
-  - Performance: **2-3x mais rápido** que com alocação dinâmica
-  - Suficiente para expressões com até 64 níveis de profundidade (mais que adequado)
-- **Algoritmo**:
-  1. Cria pilha estática de doubles `[64]`
-  2. Para cada token:
-     - Número → busca valor em `rpn->values[token.value_index]`, empilha
+    EvalError error;
+    double value;
+} EvalResult;
+```
 - **Finalidade**: Retornar resultado e status de erro
 - **value**: Válido apenas se `error == EVAL_OK`
 
@@ -382,13 +378,16 @@ typedef struct {
   - `rpn` (const TokenBuffer*): Expressão em RPN
   - `var_value` (double): Valor para x, theta ou t
 - **Saída**: `EvalResult` (erro + valor)
+- **Otimização**: Usa pilha **estática** de 64 níveis (sem malloc/free por avaliação)
+  - Overhead: ~512 bytes na stack
+  - Performance: **2-3x mais rápido** que com alocação dinâmica
+  - Suficiente para expressões com até 64 níveis de profundidade (mais que adequado)
 - **Algoritmo**:
-  1. Cria pilha de doubles20 total):
-  - Trigonométricas: sin, cos, tan
-  - Inversas: asin, acos, atan
-  - Hiperbólicas: sinh, cosh, tanh
-  - Hiperbólicas inversas: asinh, acosh, atanh
-  - Exponencial: exp (e^x)
+  1. Cria pilha estática de doubles `[64]`
+  2. Para cada token:
+     - Número → busca valor em `rpn->values[token.value_index]`, empilha
+     - Variável → empilha var_value
+     - Constante (pi, e) → empilha valor
      - Operador → desempilha 2, calcula, empilha
      - Função → desempilha 1, calcula, empilha
   3. Retorna valor final (deve sobrar exatamente 1 na pilha)
@@ -403,11 +402,12 @@ typedef struct {
       printf("Resultado: %g\n", result.value);  // 2.68294
   }
   ```
-- **Funções suportadas** (19 total):
+- **Funções suportadas** (20 total):
   - Trigonométricas: sin, cos, tan
   - Inversas: asin, acos, atan
   - Hiperbólicas: sinh, cosh, tanh
   - Hiperbólicas inversas: asinh, acosh, atanh
+  - Exponencial: exp (e^x)
   - Logaritmos: log (ln), log10
   - Outras: abs, sqrt, ceil, floor, frac
 
@@ -446,7 +446,19 @@ parser_tokenize()
 TokenBuffer com tokens
        ↓
 debug_print_tokens() [opcional]
-   Otimizações de Performance
+       ↓
+parser_to_rpn() [Fase 2]
+       ↓
+TokenBuffer em RPN
+       ↓
+evaluator_rpn() [Fase 3]
+       ↓
+double resultado
+```
+
+---
+
+## Otimizações de Performance
 
 ### 1. Token Compacto (Economia de Memória)
 
