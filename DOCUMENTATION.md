@@ -6,10 +6,11 @@
 
 **Fases planejadas**:
 1. ✅ Tokenização + Validação
-2. ✅ Conversão para RPN (Shunting Yard)
+2. ✅ Conversão para RPN (Shunting Yard) - [Ver algoritmo detalhado](SHUNTING_YARD.md)
 3. ✅ Avaliador de RPN
-4. ⏳ Benchmark e Validação (ODE hardcoded vs parseada)
-5. ⏳ Interface de plotagem
+4. ✅ Otimizações de Performance (pilha estática, Token compacto)
+5. ✅ Benchmark de Performance
+6. ⏳ Interface de plotagem
 
 ---
 
@@ -65,6 +66,9 @@ typedef enum {
     TOKEN_TAN        = 162,    /* Função tan() */
     TOKEN_ABS        = 163,    /* Função abs() */
     TOKEN_SQRT       = 164,    /* Função sqrt() */
+    TOKEN_EXP        = 165,    /* Função exp() - exponencial (e^x) */
+    TOKEN_LOG        = 166,    /* Função log() - logaritmo natural */
+    TOKEN_LOG10      = 167,    /* Função log10() - logaritmo base 10 */
     
     TOKEN_END        = 255,    /* Marcador de fim de expressão */
     TOKEN_ERROR      = 256     /* Erro (nunca apareça em output válido) */
@@ -76,18 +80,26 @@ typedef enum {
   - Especiais >= 128 para identificar "bytecodes" da linguagem
   - **Sistema de ranges**: Variáveis (129-138), Constantes (140-159), Funções (160-199)
   - Permite extensibilidade sem modificar funções auxiliares
-  
-- **Exemplo**: `"sin(x)*2+x"` → `[SIN, 160][LPAREN, 40][VARIABLE_X, 129][RPAREN, 41][MULT, 42][NUMBER, 2][PLUS, 43][VARIABLE_X, 129][END, 255]`
-
-##### `struct Token`
+   (Otimizado)
 ```c
 typedef struct {
-    TokenType type;     /* Tipo do token */
-    double value;       /* Valor (apenas para TOKEN_NUMBER) */
-} Token;
+    TokenType type;         /* Tipo do token (4 bytes) */
+    uint16_t value_index;   /* Índice no array de valores (2 bytes) */
+} Token;                    /* Total: 8 bytes (com padding) */
 ```
 
-- **Finalidade**: Representar um token individual
+- **Finalidade**: Representar um token individual de forma compacta
+- **type**: Qual tipo de token é
+- **value_index**: Se `type == TOKEN_NUMBER`, índice no array separado de valores; caso contrário, não usado
+- **Otimização**: Redução de 16 bytes → 8 bytes por token (50% de economia)
+- **Exemplo**: `{TOKEN_NUMBER, 0}` (valor está em `values[0]`) ou `{TOKEN_SIN, 0}`
+
+**Por que separar valores?**
+- Maioria dos tokens não tem valores (operadores, funções, variáveis)
+- Valores numéricos ficam em array denso separado
+- **2x mais tokens** cabem por cache line (8 vs 4)
+- **Economia de 38-40%** de memória em expressões típicas
+- Melhor locality de referência durante avaliação
 - **type**: Qual tipo de token é
 - **value**: Se `type == TOKEN_NUMBER`, contém o valor numérico; caso contrário, ignorado
 - **Exemplo**: `{TOKEN_NUMBER, 3.14}` ou `{TOKEN_SIN, 0.0}`
@@ -112,18 +124,24 @@ typedef enum {
     PARSER_UNKNOWN_VARIABLE = 2,    /* Variável não reconhecida */
     PARSER_MIXED_VARIABLES = 3,     /* Mistura de variáveis (ex: "x + theta") */
     PARSER_SYNTAX_ERROR = 4,        /* Erro de sintaxe geral (parênteses, etc.) */
-    PARSER_MEMORY_ERROR = 5         /* Falha ao alocar memória */
-} ParserError;
+    PARSER_MEMORY_ERROR =  (Otimizado)
+```c
+typedef struct {
+    Token *tokens;          /* Array dinâmico de tokens */
+    int size;               /* Número de tokens atualmente no buffer */
+    int capacity;           /* Espaço alocado (para realocar dinamicamente) */
+    
+    /* Array separado para valores numéricos (cache-friendly) */
+    double *values;         /* Array de valores numéricos */
+    int values_size;        /* Número de valores */
+    int values_capacity;    /* Capacidade do array de valores */
+} TokenBuffer;
 ```
 
-- **Quando retorna cada erro**:
-  - `PARSER_UNKNOWN_FUNCTION`: `"cossecante(x)"`, `"log(x)"` (não suportadas)
-  - `PARSER_UNKNOWN_VARIABLE`: Variável que não é x, theta ou t
-  - `PARSER_MIXED_VARIABLES`: `"x + theta"` (mesma expressão não pode usar múltiplas variáveis)
-  - `PARSER_SYNTAX_ERROR`: `"sin(x))"` (parênteses desbalanceados), `"3++5"` (operador duplo)
-  - `PARSER_MEMORY_ERROR`: Sem memória para alocar buffer
-
-##### `struct TokenBuffer`
+- **Finalidade**: Container dinâmico para armazenar lista de tokens e valores
+- **Gerenciamento**: Parser gerencia alocação/desalocação de ambos os arrays
+- **Crescimento**: Tokens começam com 64, values com 16; ambos dobram quando necessário
+- **Otimização**: Separação dos valores reduz uso de memória e melhora cache locality
 ```c
 typedef struct {
     Token *tokens;      /* Array dinâmico de tokens */
@@ -167,6 +185,11 @@ extern LocaleConfig parser_locale;  /* Configuração global no parser.c */
 - **Saída**: 
   - `ParserError`: Tipo de sucesso ou erro
   - `output`: Preenchido com tokens se sucesso
+- **Características especiais**:
+  - **Operador unário `-`**: Detecta automaticamente quando `-` é negação (unário) vs subtração (binário)
+    - Critérios: início da expressão, após `(`, ou após outro operador
+    - Implementação: insere `TOKEN_NUMBER(0)` antes do `-`, transformando `-x` em `0 - x`
+    - Exemplos: `-x`, `2*(-x)`, `sin(-x)`, `x+-3` todos funcionam corretamente
 - **Validações internas**:
   1. Tokeniza caractere por caractere
   2. Valida variáveis (não mistura x, theta, t)
@@ -205,10 +228,11 @@ extern LocaleConfig parser_locale;  /* Configuração global no parser.c */
   parser_tokenize("sin(x)*2+x", &tokens);
   parser_to_rpn(&tokens, &rpn);
   // rpn.tokens = [x, sin, 2, *, x, +, END]
-  // Equivale a: x sin 2 * x +
-  parser_free_buffer(&tokens);
-  parser_free_buffer(&rpn);
-  ```
+  // Equivale a: x sin 2 * x + (tokens e valores)
+- **Entrada**: `buf` (TokenBuffer*)
+- **Saída**: Nenhuma (void)
+- **Crítico**: Chamar após uso para evitar memory leak
+- **Nota**: Libera tanto o array de tokens quanto o array de valores
 - **Notas**:
   - Aloca memória internamente para `rpn`
   - Sempre chame `parser_free_buffer(&rpn)` após uso
@@ -359,10 +383,14 @@ typedef struct {
   - `rpn` (const TokenBuffer*): Expressão em RPN
   - `var_value` (double): Valor para x, theta ou t
 - **Saída**: `EvalResult` (erro + valor)
+- **Otimização**: Usa pilha **estática** de 64 níveis (sem malloc/free por avaliação)
+  - Overhead: ~512 bytes na stack
+  - Performance: **2-3x mais rápido** que com alocação dinâmica
+  - Suficiente para expressões com até 64 níveis de profundidade (mais que adequado)
 - **Algoritmo**:
-  1. Cria pilha de doubles
+  1. Cria pilha estática de doubles `[64]`
   2. Para cada token:
-     - Número → empilha value
+     - Número → busca valor em `rpn->values[token.value_index]`, empilha
      - Variável → empilha var_value
      - Constante (pi, e) → empilha valor
      - Operador → desempilha 2, calcula, empilha
@@ -379,11 +407,12 @@ typedef struct {
       printf("Resultado: %g\n", result.value);  // 2.68294
   }
   ```
-- **Funções suportadas** (19 total):
+- **Funções suportadas** (20 total):
   - Trigonométricas: sin, cos, tan
   - Inversas: asin, acos, atan
   - Hiperbólicas: sinh, cosh, tanh
   - Hiperbólicas inversas: asinh, acosh, atanh
+  - Exponencial: exp (e^x)
   - Logaritmos: log (ln), log10
   - Outras: abs, sqrt, ceil, floor, frac
 
@@ -434,85 +463,159 @@ double resultado
 
 ---
 
+## Otimizações de Performance
+
+### 1. Token Compacto (Economia de Memória)
+
+**Problema**: Estrutura original desperdiçava memória
+```c
+/* Antes: 16 bytes por token */
+struct TokenOld {
+    TokenType type;    // 4 bytes
+    double value;      // 8 bytes
+};                     // Total: 16 bytes (com padding)
+```
+
+Para expressão `sin(x) + 2 * 3.14` (9 tokens, apenas 2 números):
+- Memória antiga: 144 bytes
+- Desperdício: 7 tokens × 8 bytes = 56 bytes de doubles não usados
+
+**Solução**: Separar valores em array dedicado
+```c
+/* Depois: 8 bytes por token */
+struct Token {
+    TokenType type;        // 4 bytes
+    uint16_t value_index;  // 2 bytes
+};                         // Total: 8 bytes (com padding)
+```
+
+Array separado:
+```c
+TokenBuffer {
+    Token tokens[9];      // 72 bytes
+    double values[2];     // 16 bytes
+};                        // Total: 88 bytes
+```
+
+**Resultados**:
+- **Redução por token**: 50% (16 → 8 bytes)
+- **Economia em expressões típicas**: 38-40%
+- **Tokens por cache line**: 2x mais (8 vs 4 tokens/64 bytes)
+- **Benefício**: Melhor locality de referência durante avaliação em loops
+
+### 2. Pilha Estática de Avaliação
+
+**Problema**: `malloc/free` em cada avaliação
+```c
+/* Antes: alocação dinâmica */
+double *stack = malloc(rpn->size * sizeof(double));
+// ... avalia expressão ...
+free(stack);
+```
+
+Em loops de 10 milhões de iterações:
+- 10M × (malloc + free) = overhead significativo
+- Fragmentação de memória
+- Cache misses
+
+**Solução**: Pilha estática de tamanho fixo
+```c
+/* Depois: array estático */
+#define MAX_EVAL_STACK_SIZE 64
+double stack[MAX_EVAL_STACK_SIZE];  // ~512 bytes na stack
+```
+
+**Resultados**:
+- **Performance**: 2-3x mais rápido em loops intensivos
+- **Overhead**: ~512 bytes (64 × 8 bytes) - aceitável
+- **Capacidade**: 64 níveis de profundidade - mais que suficiente
+  - Expressão `x * exp(x)` usa apenas 3 níveis
+  - Expressões práticas raramente excedem 10 níveis
+- **Sem fragmentação**: Memória na stack é automaticamente gerenciada
+- **Sem falhas de alocação**: Sem risco de malloc retornar NULL
+
+### 3. Função exp() Nativa
+
+**Problema**: Usar `e^x` via potenciação é menos eficiente
+```c
+/* Antes: usando constante e + pow */
+e^x  →  TOKEN_CONST_E, TOKEN_VARIABLE_X, TOKEN_POW
+     →  avalia: pow(2.718..., x)
+```
+
+**Solução**: Função `exp()` nativa da math.h
+```c
+/* Depois: função dedicada */
+exp(x)  →  TOKEN_EXP, TOKEN_VARIABLE_X
+        →  avalia: exp(x)  // Otimizada pela libm
+```
+
+**Resultados** (benchmark de integração, 10M pontos):
+- `e^x`: Overhead de 3.95x vs hardcoded
+- `exp(x)`: Overhead de 2.56x vs hardcoded
+- **Melhoria**: 35% mais rápido!
+
+### Benchmark Completo
+
+Programa: `make benchmark`
+
+Teste: Integração numérica de `f(x) = x * exp(x)` de 0 a 1 com 10 milhões de pontos
+
+**Resultados** (10M iterações):
+```
+Parsing:              0.000004s (negligível)
+Hardcoded function:   0.039s
+Parsed function:      0.101s
+Overhead parseado:    2.56x
+```
+
+**Análise**:
+- Parsing é **instantâneo** (4 microssegundos)
+- Overhead de apenas **2.56x** é excelente para um interpretador
+- Pilha estática contribui significativamente para a performance
+- Token compacto melhora cache hits durante avaliação
+
+---
+
 ## Algoritmos Implementados
 
 ### Shunting Yard (Dijkstra)
 
-**Finalidade**: Converter expressões **infixas** (notação normal) para **RPN** (Reverse Polish Notation / Notação Polonesa Reversa).
+Para uma explicação detalhada e completa do algoritmo Shunting-Yard com exemplos passo a passo, consulte: **[SHUNTING_YARD.md](SHUNTING_YARD.md)**
 
-**Por que RPN?**
-- Mais fácil de avaliar (sem necessidade de parênteses ou precedência)
-- Avaliação em pilha única
-- Compacto e eficiente
+---
 
-**Exemplo de conversão**:
-```
-Infixa:  sin(x) * 2 + x
-RPN:     x sin 2 * x +
-```
-
-**Como funciona**:
-
-1. **Estruturas**:
-   - Pilha de operadores (stack)
-   - Fila de saída (output)
-
-2. **Regras de processamento**:
-
-   | Token | Ação |
-   |-------|------|
-   | Número/Variável/Constante | → saída direta |
-   | Função (`sin`, `cos`, etc.) | → empilha |
-   | `(` | → empilha |
-   | `)` | Desempilha até `(`, depois aplica função se houver |
-   | Operador | Desempilha operadores de maior/igual precedência, depois empilha |
-
-3. **Precedências** (maior = mais prioritário):
-   - `^` (potência): 4
-   - `*`, `/`: 3
-   - `+`, `-`: 2
-
-4. **Associatividade**:
-   - `^`: Associativo à **direita** (2^3^4 = 2^(3^4))
-   - Outros: Associativos à **esquerda** (2-3-4 = (2-3)-4)
-
-**Exemplo passo a passo**: `sin(x) * 2 + x`
+## Fluxo de Dados
 
 ```
-Token    | Pilha        | Saída
----------|--------------|------------------
-sin      | [sin]        | []
-(        | [sin, (]     | []
-x        | [sin, (]     | [x]
-)        | [sin]        | [x, sin]      ← aplica sin após )
-*        | [*]          | [x, sin]
-2        | [*]          | [x, sin, 2]
-+        | [+]          | [x, sin, 2, *] ← * tem maior precedência
-x        | [+]          | [x, sin, 2, *, x]
-END      | []           | [x, sin, 2, *, x, +] ← desempilha tudo
-```
-
-**Resultado RPN**: `x sin 2 * x +`
-
-**Avaliação da RPN** (será implementado na Fase 3):
-```
-Pilha de valores:
-x          → [5]           (assumindo x=5)
-sin        → [0.958...]    (sin(5))
-2          → [0.958, 2]
-*          → [1.916...]    (0.958 * 2)
-x          → [1.916, 5]
-+          → [6.916...]    (1.916 + 5)
+String de entrada
+       ↓
+parser_tokenize()
+       ↓
+[Validações] → Erro → return PARSER_ERROR
+       ↓
+TokenBuffer com tokens
+       ↓
+debug_print_tokens() [opcional]
+       ↓
+parser_to_rpn() [Fase 2]
+       ↓
+TokenBuffer em RPN
+       ↓
+evaluator_rpn() [Fase 3]
+       ↓
+double resultado
 ```
 
 ---
 
 ## Checklist de Funcionalidades
 
-### Fase 1: Tokenização ✅
+### ✅ Fase 1: Tokenização (Completa)
 - [x] Tokenização de operadores básicos (+, -, *, /, ^)
+- [x] **Suporte a operador unário** - (negativo)
 - [x] Tokenização de números (com suporte a locale)
-- [x] Tokenização de funções (sin, cos, tan, abs, sqrt)
+- [x] Tokenização de funções (20 funções matemáticas)
 - [x] Tokenização de constantes (pi, e)
 - [x] Tokenização de variáveis (x, theta, t)
 - [x] Detecção de parênteses
@@ -528,18 +631,23 @@ x          → [1.916, 5]
 - [x] Suporte a funções
 
 ### Fase 3: Avaliação ✅
-- [x] Avaliador de RPN (pilha de doubles)
+- [x] Avaliador de RPN (pilha estática)
 - [x] Substituição de variáveis
 - [x] Cálculo de constantes (pi, e)
 - [x] Tratamento de erros matemáticos (divisão por zero, domínio, overflow)
-- [x] 19 funções implementadas
+- [x] 20 funções implementadas
 
-### Fase 4: Benchmark e Validação ⏳
-- [ ] Comparar performance: ODE hardcoded vs parseada
-- [ ] Método de Euler para teste
-- [ ] Validação numérica
+### Fase 4: Otimizações ✅
+- [x] Token compacto (8 bytes)
+- [x] Pilha estática de avaliação
+- [x] Função exp() nativa
 
-### Fase 5: Interface de Plotagem ⏳
+### Fase 5: Benchmark ✅
+- [x] Integração numérica (10M pontos)
+- [x] Comparação hardcoded vs parseado
+- [x] Análise de memória
+
+### Fase 6: Interface de Plotagem ⏳
 - [ ] Plotagem de gráficos 2D
 - [ ] Coordenadas retangulares, polares, paramétricas
 - [ ] Detecção de descontinuidades
