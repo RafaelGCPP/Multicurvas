@@ -14,7 +14,9 @@ Implementar um sistema que permita:
 
 ### ✅ Fase 1: Tokenização (Completa)
 - Operadores: `+`, `-`, `*`, `/`, `^`
-- **Operador unário `-`** (negativo): `-x`, `2*(-x)`, `sin(-x)` funcionam corretamente
+- **Operadores unários**:
+  - `-` (negação): representado internamente como `TOKEN_NEG` (prefix). Encadeamentos como `--x` ou `---x` são suportados e avaliados corretamente.
+  - `+` (positivo/unário): é tratado como no-op quando aparece em contexto unário (por exemplo `+x`, `x+ +3`, `2*(+x)`).
 - **20 Funções**: `sin`, `cos`, `tan`, `abs`, `sqrt`, `exp`, `log`, `log10`, `sinh`, `cosh`, `tanh`, `asin`, `acos`, `atan`, `asinh`, `acosh`, `atanh`, `ceil`, `floor`, `frac`
 - Constantes: `pi`, `e`
 - Variáveis: `x`, `theta`, `t`
@@ -65,6 +67,21 @@ Implementar um sistema que permita:
 cd /home/hlpp/work/Multicurvas
 make clean
 make all
+```
+
+### Build & Test (novo)
+
+O repositório inclui agora um fluxo de testes integrado via `Makefile` (ver PR #1). Comandos úteis:
+
+```bash
+# compila e executa a suíte demonstrativa (tokenização, RPN, avaliação, análises)
+make all
+
+# executa apenas o benchmark
+make benchmark
+
+# executa análise de memória
+make memtest
 ```
 
 ### Execução
