@@ -45,10 +45,10 @@ static void test_expression(const char *expr) {
     /* Bytecode compactado */
     debug_print_bytecode(&tokens);
     
-    /* Converte para RPN (stub por enquanto) */
+    /* Converte para RPN */
     err = parser_to_rpn(&tokens, &rpn);
     if (err == PARSER_OK) {
-        printf("✓ Conversão para RPN OK (ainda é cópia - será implementado depois)\n");
+        printf("✓ Conversão para RPN OK\n");
         debug_print_tokens(&rpn);
         parser_free_buffer(&rpn);
     }
@@ -70,6 +70,8 @@ int main(void) {
     test_expression("9*(theta-pi/2)");
     test_expression("2*e^(-t/2)");
     test_expression("3.14159");
+    test_expression("2.5*x+1.75");
+    test_expression("0.5^2");
     
     /* TESTE 2: Com locale COMMA */
     printf("\n\n▶▶▶ TESTE COM LOCALE COMMA (vírgula decimal) ▶▶▶\n");
@@ -79,6 +81,8 @@ int main(void) {
     test_expression("9*(theta-pi/2)");
     test_expression("2*e^(-t/2)");
     test_expression("3,14159");
+    test_expression("2,5*x+1,75");
+    test_expression("0,5^2");
     
     /* TESTE 3: Erros diversos */
     printf("\n\n▶▶▶ TESTES COM ERROS ▶▶▶\n");

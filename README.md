@@ -20,9 +20,10 @@ Implementar um sistema que permita:
 - Parênteses balanceados
 - Suporte a locale (ponto ou vírgula decimal)
 
-### ⏳ Fase 2: RPN (Em Desenvolvimento)
+### ✅ Fase 2: RPN (Completa)
 - Algoritmo Shunting Yard de Dijkstra
 - Precedência de operadores
+- Associatividade (^ à direita, outros à esquerda)
 - Suporte a funções
 
 ### ⏳ Fase 3: Avaliação

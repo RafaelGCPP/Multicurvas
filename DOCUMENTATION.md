@@ -6,7 +6,7 @@
 
 **Fases planejadas**:
 1. ✅ Tokenização + Validação
-2. ⏳ Conversão para RPN
+2. ✅ Conversão para RPN (Shunting Yard)
 3. ⏳ Avaliador de RPN
 4. ⏳ Interface de plotagem
 
@@ -48,16 +48,23 @@ typedef enum {
     
     /* Especiais (>= 128) */
     TOKEN_NUMBER     = 128,    /* Número literal (valor em Token.value) */
+    
+    /* Variáveis: range 129-138 (10 slots) */
     TOKEN_VARIABLE_X = 129,    /* Variável x */
     TOKEN_VARIABLE_THETA = 130,/* Variável theta */
     TOKEN_VARIABLE_T = 131,    /* Variável t */
+    
+    /* Constantes: range 140-159 (20 slots) */
     TOKEN_CONST_PI   = 140,    /* Constante π */
     TOKEN_CONST_E    = 141,    /* Constante e */
-    TOKEN_SIN        = 150,    /* Função sin() */
-    TOKEN_COS        = 151,    /* Função cos() */
-    TOKEN_TAN        = 152,    /* Função tan() */
-    TOKEN_ABS        = 153,    /* Função abs() */
-    TOKEN_SQRT       = 154,    /* Função sqrt() */
+    
+    /* Funções: range 160-199 (40 slots) */
+    TOKEN_SIN        = 160,    /* Função sin() */
+    TOKEN_COS        = 161,    /* Função cos() */
+    TOKEN_TAN        = 162,    /* Função tan() */
+    TOKEN_ABS        = 163,    /* Função abs() */
+    TOKEN_SQRT       = 164,    /* Função sqrt() */
+    
     TOKEN_END        = 255,    /* Marcador de fim de expressão */
     TOKEN_ERROR      = 256     /* Erro (nunca apareça em output válido) */
 } TokenType;
@@ -66,9 +73,10 @@ typedef enum {
 - **Estratégia de encoding**:
   - Operadores básicos usam valores ASCII (permite cast direto: `(char)token`)
   - Especiais >= 128 para identificar "bytecodes" da linguagem
-  - Compacta a string original em tokens de byte
+  - **Sistema de ranges**: Variáveis (129-138), Constantes (140-159), Funções (160-199)
+  - Permite extensibilidade sem modificar funções auxiliares
   
-- **Padrão que será usado**: Exemplo: `"sin(x)*2+x"` → `[SIN, 150][LPAREN, 40][VARIABLE_X, 129][RPAREN, 41][MULT, 42][NUMBER, 2][PLUS, 43][VARIABLE_X, 129][END, 255]`
+- **Exemplo**: `"sin(x)*2+x"` → `[SIN, 160][LPAREN, 40][VARIABLE_X, 129][RPAREN, 41][MULT, 42][NUMBER, 2][PLUS, 43][VARIABLE_X, 129][END, 255]`
 
 ##### `struct Token`
 ```c
@@ -175,13 +183,35 @@ extern LocaleConfig parser_locale;  /* Configuração global no parser.c */
   ```
 
 ##### `ParserError parser_to_rpn(TokenBuffer *tokens, TokenBuffer *rpn)`
-- **Objetivo**: Converter tokens infix para RPN (Shunting Yard algorithm - Fase 2)
+- **Objetivo**: Converter tokens infixa para RPN usando algoritmo Shunting Yard
 - **Entrada**:
   - `tokens` (TokenBuffer*): Tokens em notação infixa
-  - `rpn` (TokenBuffer*): Buffer para receber RPN
-- **Saída**: `ParserError`
-- **Status**: ⏳ Stub (copia tokens por enquanto)
-- **Algoritmo planejado**: Shunting Yard de Dijkstra
+  - `rpn` (TokenBuffer*): Buffer para receber RPN (será inicializado automaticamente)
+- **Saída**: `ParserError` (PARSER_OK, PARSER_MEMORY_ERROR, PARSER_SYNTAX_ERROR)
+- **Status**: ✅ Implementado (Shunting Yard de Dijkstra)
+- **Algoritmo**: 
+  - Usa pilha de operadores e fila de saída
+  - Números/variáveis/constantes → saída direta
+  - Funções → empilha
+  - `(` → empilha
+  - `)` → desempilha até `(`, depois aplica função (se houver)
+  - Operadores → desempilha por precedência, depois empilha
+  - **Precedências**: `^` (4), `*` `/` (3), `+` `-` (2)
+  - **Associatividade**: `^` é associativo à direita, outros à esquerda
+- **Exemplo**:
+  ```c
+  TokenBuffer tokens, rpn;
+  parser_tokenize("sin(x)*2+x", &tokens);
+  parser_to_rpn(&tokens, &rpn);
+  // rpn.tokens = [x, sin, 2, *, x, +, END]
+  // Equivale a: x sin 2 * x +
+  parser_free_buffer(&tokens);
+  parser_free_buffer(&rpn);
+  ```
+- **Notas**:
+  - Aloca memória internamente para `rpn`
+  - Sempre chame `parser_free_buffer(&rpn)` após uso
+  - Não modifica o buffer de entrada `tokens`
 
 ##### `void parser_init_buffer(TokenBuffer *buf)`
 - **Objetivo**: Inicializar buffer vazio
@@ -335,6 +365,79 @@ double resultado
 
 ---
 
+## Algoritmos Implementados
+
+### Shunting Yard (Dijkstra)
+
+**Finalidade**: Converter expressões **infixas** (notação normal) para **RPN** (Reverse Polish Notation / Notação Polonesa Reversa).
+
+**Por que RPN?**
+- Mais fácil de avaliar (sem necessidade de parênteses ou precedência)
+- Avaliação em pilha única
+- Compacto e eficiente
+
+**Exemplo de conversão**:
+```
+Infixa:  sin(x) * 2 + x
+RPN:     x sin 2 * x +
+```
+
+**Como funciona**:
+
+1. **Estruturas**:
+   - Pilha de operadores (stack)
+   - Fila de saída (output)
+
+2. **Regras de processamento**:
+
+   | Token | Ação |
+   |-------|------|
+   | Número/Variável/Constante | → saída direta |
+   | Função (`sin`, `cos`, etc.) | → empilha |
+   | `(` | → empilha |
+   | `)` | Desempilha até `(`, depois aplica função se houver |
+   | Operador | Desempilha operadores de maior/igual precedência, depois empilha |
+
+3. **Precedências** (maior = mais prioritário):
+   - `^` (potência): 4
+   - `*`, `/`: 3
+   - `+`, `-`: 2
+
+4. **Associatividade**:
+   - `^`: Associativo à **direita** (2^3^4 = 2^(3^4))
+   - Outros: Associativos à **esquerda** (2-3-4 = (2-3)-4)
+
+**Exemplo passo a passo**: `sin(x) * 2 + x`
+
+```
+Token    | Pilha        | Saída
+---------|--------------|------------------
+sin      | [sin]        | []
+(        | [sin, (]     | []
+x        | [sin, (]     | [x]
+)        | [sin]        | [x, sin]      ← aplica sin após )
+*        | [*]          | [x, sin]
+2        | [*]          | [x, sin, 2]
++        | [+]          | [x, sin, 2, *] ← * tem maior precedência
+x        | [+]          | [x, sin, 2, *, x]
+END      | []           | [x, sin, 2, *, x, +] ← desempilha tudo
+```
+
+**Resultado RPN**: `x sin 2 * x +`
+
+**Avaliação da RPN** (será implementado na Fase 3):
+```
+Pilha de valores:
+x          → [5]           (assumindo x=5)
+sin        → [0.958...]    (sin(5))
+2          → [0.958, 2]
+*          → [1.916...]    (0.958 * 2)
+x          → [1.916, 5]
++          → [6.916...]    (1.916 + 5)
+```
+
+---
+
 ## Checklist de Funcionalidades
 
 ### Fase 1: Tokenização ✅
@@ -349,11 +452,11 @@ double resultado
 - [x] Suporte a locale (ponto e vírgula decimal)
 - [x] Debug output (hex, tokens)
 
-### Fase 2: RPN ⏳
-- [ ] Algoritmo Shunting Yard
-- [ ] Suporte a precedência de operadores
-- [ ] Suporte a associatividade
-- [ ] Suporte a funções
+### Fase 2: RPN ✅
+- [x] Algoritmo Shunting Yard
+- [x] Suporte a precedência de operadores
+- [x] Suporte a associatividade (^ é associativo à direita)
+- [x] Suporte a funções
 
 ### Fase 3: Avaliação ⏳
 - [ ] Avaliador de RPN
@@ -380,12 +483,41 @@ double resultado
 - Parser aloca internamente, usuário não precisa alocar TokenBuffer
 
 ### Extensão Futura
-Para adicionar nova função (ex: "log"):
-1. Adicione `TOKEN_LOG = 155` em `tokens.h`
-2. Adicione `CHECK_KEYWORD("log", TOKEN_LOG)` em `parser.c`
-3. Adicione case no `debug_token_name()` em `debug.c`
-4. Implemente suporte em RPN (Fase 2)
-5. Implemente suporte em avaliador (Fase 3)
+
+**Sistema de ranges para extensibilidade:**
+
+O projeto usa **ranges de valores** para permitir adição de funções, variáveis e constantes sem modificar a lógica de parsing:
+
+```c
+/* Ranges definidos em tokens.h */
+#define TOKEN_VARIABLE_START  129
+#define TOKEN_VARIABLE_END    138   /* 10 slots disponíveis */
+
+#define TOKEN_CONST_START     140
+#define TOKEN_CONST_END       159   /* 20 slots disponíveis */
+
+#define TOKEN_FUNCTION_START  160
+#define TOKEN_FUNCTION_END    199   /* 40 slots disponíveis */
+```
+
+**Para adicionar nova função** (ex: "log"):
+1. Em `tokens.h`: `TOKEN_LOG = 165` (dentro do range 160-199)
+2. Em `parser.c`: `CHECK_KEYWORD("log", TOKEN_LOG)`
+3. Em `debug.c`: Case no `debug_token_name()`
+4. No avaliador (Fase 3): Case para calcular `log()`
+
+**Não precisa modificar**: `is_function()`, `is_variable()`, `is_constant()` - usam ranges!
+
+**Para adicionar nova variável** (ex: "r"):
+1. Em `tokens.h`: `TOKEN_VARIABLE_R = 132` (dentro do range 129-138)
+2. Em `parser.c`: `CHECK_KEYWORD("r", TOKEN_VARIABLE_R)`
+3. Em `debug.c`: Case no `debug_token_name()`
+
+**Para adicionar nova constante** (ex: "phi" = número de ouro):
+1. Em `tokens.h`: `TOKEN_CONST_PHI = 142` (dentro do range 140-159)
+2. Em `parser.c`: `CHECK_KEYWORD("phi", TOKEN_CONST_PHI)`
+3. Em `debug.c`: Case no `debug_token_name()`
+4. No avaliador (Fase 3): Retornar valor `1.618033988749...`
 
 ---
 
