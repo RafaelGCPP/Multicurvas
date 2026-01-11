@@ -186,10 +186,13 @@ extern LocaleConfig parser_locale;  /* Configuração global no parser.c */
   - `ParserError`: Tipo de sucesso ou erro
   - `output`: Preenchido com tokens se sucesso
 - **Características especiais**:
-  - **Operador unário `-`**: Detecta automaticamente quando `-` é negação (unário) vs subtração (binário)
-    - Critérios: início da expressão, após `(`, ou após outro operador
-    - Implementação: insere `TOKEN_NUMBER(0)` antes do `-`, transformando `-x` em `0 - x`
-    - Exemplos: `-x`, `2*(-x)`, `sin(-x)`, `x+-3` todos funcionam corretamente
+  - **Operadores unários**:
+    - `-` (negação): agora representado internamente como um token unário `TOKEN_NEG` (prefix).
+      - Critérios para ser unário: início da expressão, após `(`, ou após outro operador/unário (`+`, `-`, `*`, `/`, `^`, `neg`).
+      - Implementação: o parser emite `TOKEN_NEG` em contexto unário em vez de inserir `0` antes do `-`. No RPN `TOKEN_NEG` é tratado como uma função unária de alta precedência.
+      - Vantagem: encadeamentos como `--x`, `---x`, `-+x` são avaliados corretamente (`--x` = x, `---x` = -x).
+    - `+` (positivo/unário): é tratado como no-op (ignorado) quando detectado em contexto unário; `+x`, `(+x)`, `x+ +3` funcionam como esperado.
+    - Exemplos: `-x`, `2*(-x)`, `sin(-x)`, `x+-3`, `--x`, `---x` todos são suportados corretamente
 - **Validações internas**:
   1. Tokeniza caractere por caractere
   2. Valida variáveis (não mistura x, theta, t)
