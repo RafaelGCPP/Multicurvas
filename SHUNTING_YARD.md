@@ -70,7 +70,8 @@ No nosso sistema:
 Precedência 1 (baixa):    +  -
 Precedência 2 (média):    *  /
 Precedência 3 (alta):     ^
-Precedência 4 (máxima):   funções (sin, cos, etc.)
+Precedência 4 (mais alta): NEG (negação unária)
+Precedência 5 (máxima):   funções (sin, cos, etc.)
 ```
 
 ### Associatividade
@@ -79,6 +80,10 @@ Precedência 4 (máxima):   funções (sin, cos, etc.)
   - Exemplo: `5 - 3 - 2` = `(5 - 3) - 2` = 0
 - **Direita → Esquerda**: `^`
   - Exemplo: `2 ^ 3 ^ 2` = `2 ^ (3 ^ 2)` = 512
+ - **Unários (prefix)**: `NEG` (negação) é tratado como operador/função prefixo com **associatividade à direita**.
+    - Exemplo: `- - x` → `NEG NEG x` → aplica-se direito-para-esquerda (`-(-x)`)
+
+Nota: O parser representa o `-` unário como `TOKEN_NEG`. Isso evita hacks como inserir `0` antes do `-` e permite encadear unários corretamente.
 
 ## Exemplo Passo a Passo
 
