@@ -10,7 +10,7 @@
 3. ✅ Avaliador de RPN
 4. ✅ Otimizações de Performance (pilha estática, Token compacto)
 5. ✅ Benchmark de Performance
-6. ⏳ Interface de plotagem
+6. ✅ Sistema de Plotagem (CSV e SVG)
 
 ---
 
@@ -749,4 +749,138 @@ O projeto usa **ranges de valores** para permitir adição de funções, variáv
 
 ---
 
-**Última atualização**: 2026-01-11
+## Sistema de Plotagem (Fase 6)
+
+### `multicurvas_plot.h` / `multicurvas_plot.c`
+
+**Responsabilidade**: Parser secundário para curvas matemáticas e geração de amostras.
+
+#### Estruturas
+
+```c
+typedef enum {
+    PLOT_CARTESIAN,    // Y=f(x)
+    PLOT_POLAR_R,      // R=f(t)
+    PLOT_POLAR_R2,     // R**2=f(t)
+    PLOT_PARAMETRIC    // X=f(t);Y=g(t)
+} PlotType;
+
+typedef struct {
+    PlotType type;
+    char *expr1;           // Primeira expressão
+    char *expr2;           // Segunda expressão (apenas paramétrico)
+    double C, D;           // Intervalo [C,D]
+    int has_interval;      // 1 se intervalo foi especificado
+    int samples;           // Número de pontos (padrão: 80)
+} Plot;
+
+typedef struct {
+    double *x;             // Coordenadas X (cartesianas)
+    double *y;             // Coordenadas Y (cartesianas)
+    int *status;           // Status de cada ponto (0=ok, 1=erro)
+    int count;             // Pontos válidos
+    int capacity;          // Capacidade alocada
+} PlotData;
+```
+
+#### Funções Principais
+
+**`Plot *plot_parse_text(const char *input, char **errmsg)`**
+- Parse de entrada: detecta tipo, extrai expressões e intervalo
+- Sintaxe de intervalo: `:C,D:` no final (ex: `"Y=x*x:-2,3:"`)
+- Retorna `Plot*` ou `NULL` com mensagem de erro
+
+**`PlotData *plot_generate_samples(const Plot *plot, char **errmsg)`**
+- Compila expressões para RPN
+- Gera 80 pontos (padrão) no intervalo
+- Converte coordenadas polares/paramétricas para cartesianas
+- Intervalos padrão:
+  - Cartesiano: [-10, 10]
+  - Polar: [0.004π, 2π]
+  - Paramétrico: [0, 2π]
+
+**Conversões de Coordenadas:**
+- Polar: `x = r*cos(t)`, `y = r*sin(t)`
+- Polar R²: `r = sqrt(f(t))` (apenas se f(t) ≥ 0)
+- Paramétrico: direto de `(f(t), g(t))`
+
+### `render.h` / `render.c`
+
+**Responsabilidade**: Renderizadores de saída (CSV e SVG).
+
+#### Funções
+
+**`void render_csv(const PlotData *data)`**
+- Saída simples em formato CSV
+- Duas colunas: x,y
+- Para análise externa ou importação
+
+**`void render_svg(const PlotData *data, const char *title, int canvas_w, int canvas_h)`**
+- Gera SVG completo com grid profissional
+- Canvas ajustável (800×600 padrão)
+- Área de plotagem: 80% do canvas (20% margem)
+- Transformação afim: coordenadas matemáticas → pixels
+- **Grid**:
+  - Linhas principais: cada 1.0 unidade (dados)
+  - Tics menores: cada 0.2 unidades
+  - Eixos destacados em X=0, Y=0
+- **Cores configuráveis** (#defines):
+  - `COLOR_BACKGROUND` - Fundo branco (#ffffff)
+  - `COLOR_GRID_MAJOR` - Grid principal (#d0d0d0)
+  - `COLOR_GRID_MINOR` - Tics menores (#e8e8e8)
+  - `COLOR_AXES` - Eixos (#808080)
+  - `COLOR_CURVE` - Curva (#0066cc)
+- **Limites automáticos**: Bounding box dos dados
+
+### `main.c`
+
+**Responsabilidade**: CLI para geração de gráficos.
+
+#### Uso
+
+```bash
+./build/multicurvas <expressão> [formato] [largura] [altura]
+```
+
+**Argumentos:**
+- `expressão` - Obrigatório (ex: `"Y=sin(x)"`)
+- `formato` - Opcional: `csv` ou `svg` (padrão: svg)
+- `largura` - Opcional: largura do canvas SVG (padrão: 800)
+- `altura` - Opcional: altura do canvas SVG (padrão: 600)
+
+**Exemplos:**
+```bash
+# Parábola padrão
+./build/multicurvas "Y=x*x" svg > parabola.svg
+
+# Círculo em HD
+./build/multicurvas "R=5" svg 1920 1080 > circulo_hd.svg
+
+# Intervalo customizado
+./build/multicurvas "Y=sin(x):-3.14,3.14:" svg > seno.svg
+
+# Curva paramétrica
+./build/multicurvas "X=cos(t);Y=sin(t)" svg > circulo_param.svg
+
+# CSV para análise
+./build/multicurvas "Y=exp(-x/3)" csv > exponencial.csv
+```
+
+#### Tipos de Curvas Suportados
+
+| Sintaxe | Tipo | Variável | Exemplo |
+|---------|------|----------|---------|
+| `Y=f(x)` | Cartesiana | x | `"Y=x*x"` |
+| `R=f(t)` | Polar | t | `"R=5"` |
+| `R**2=f(t)` | Polar R² | t | `"R**2=cos(2*t)"` |
+| `X=f(t);Y=g(t)` | Paramétrica | t | `"X=cos(t);Y=sin(t)"` |
+
+**Notas:**
+- Prefixos case-insensitive (`y=`, `Y=`, `r=`, `R=`)
+- Polar: t em radianos (0.004π a 2π padrão)
+- R²: apenas valores não-negativos
+- Paramétrico: suporta `X=;Y=` ou `Y=;X=` (ordem automática)
+
+---
+
+**Última atualização**: 2026-01-12

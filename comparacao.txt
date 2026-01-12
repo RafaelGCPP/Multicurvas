@@ -1,0 +1,27 @@
+COMPARAÇÃO DE RENDERIZAÇÃO
+==========================
+
+Parábola Y=x²-4:
+  Antes (10%): viewBox="-12.00 -106.00 24.00 119.98" 
+               → Muito achatada (largura 24, altura 120)
+  
+  Depois (20%): viewBox="-14.00 -116.00 28.00 139.98"
+                → Preenche melhor a tela (largura 28, altura 140)
+                → Margem maior (mais "respiro" visual)
+
+Círculo Polar R=5:
+  ViewBox: "-7.00 -7.00 14.00 14.00" 
+  → Quadrado perfeito (14×14) 
+  → Renderiza como círculo perfeito no SVG
+
+Cardióide R=3+3*cos(t):
+  ViewBox com formato natural da curva
+  → Estica para preencher 800×600
+  → Boa visualização sem distorção excessiva
+
+VANTAGENS:
+✓ Gráficos ocupam melhor a área disponível
+✓ Margens maiores (20%) melhoram legibilidade
+✓ Curvas "altas e estreitas" não ficam achatadas
+✓ Círculos polares renderizam perfeitamente
+

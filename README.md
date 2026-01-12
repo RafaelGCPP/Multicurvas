@@ -52,12 +52,19 @@ Implementar um sistema que permita:
 - Overhead de apenas **2.56x** (excelente!)
 - Ferramentas de análise de memória
 
-### ⏳ Próximos Passos
-
-#### Fase 6: Interface de Plotagem
-- Plotagem de gráficos 2D
-- Suporte a coordenadas retangulares, polares e paramétricas
-- Detecção de descontinuidades (divisão por zero)
+### ✅ Fase 6: Sistema de Plotagem (Completo)
+- **Parser de curvas**: Detecta automaticamente tipo (Y=, R=, R**2=, X=;Y=)
+- **Intervalos customizados**: Sintaxe `:C,D:` para definir domínio
+- **Geração de amostras**: 80 pontos padrão com conversão de coordenadas
+- **Renderizadores**:
+  - **CSV**: Saída tabular para análise externa
+  - **SVG**: Grid profissional com linhas a cada 1.0 unidade
+    - Canvas ajustável (800×600 padrão)
+    - Área de plotagem 80% (20% margem)
+    - Eixos destacados em X=0, Y=0
+    - Tics menores a cada 0.2 unidades
+- **Limites automáticos**: Bounding box dos dados
+- **CLI completo**: `./build/multicurvas <expr> [formato] [largura] [altura]`
 
 ## 🚀 Quick Start
 
@@ -86,14 +93,35 @@ make memtest
 
 ### Execução
 
+**Geração de gráficos:**
+```bash
+# Parábola simples (SVG 800×600)
+./build/multicurvas "Y=x*x" svg > parabola.svg
+
+# Círculo polar (SVG HD 1920×1080)
+./build/multicurvas "R=5" svg 1920 1080 > circulo.svg
+
+# Intervalo customizado
+./build/multicurvas "Y=sin(x):-3.14,3.14:" svg > seno.svg
+
+# Curva paramétrica (Lissajous)
+./build/multicurvas "X=sin(3*t);Y=sin(2*t)" svg > lissajous.svg
+
+# Saída em CSV para análise
+./build/multicurvas "Y=exp(-x/3)" csv > dados.csv
+
+# Script com 10 exemplos
+./gerar_testes.sh
+```
+
 **Testes do parser:**
 ```bash
-./build/multicurvas
+./build/evalution.test
 ```
 
 **Benchmark de performance:**
 ```bash
-./build/benchmark
+./build/benchmark.test
 ```
 
 **Análise de memória:**

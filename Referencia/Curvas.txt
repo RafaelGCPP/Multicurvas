@@ -1,0 +1,148 @@
+--------------------------------------------------------------------------------
+
+                      C U R V A S    F A N T Á S T I C A S
+
+--------------------------------------------------------------------------------
+PUBLICADO NA REVISTA MICRO SISTEMAS EDIÇÃO NR.42 (MARÇO DE 1985)
+--------------------------------------------------------------------------------
+AUTOR: JORGE ALBERTO CORREIA B. SOARES
+--------------------------------------------------------------------------------
+CONVERTIDO POR KELLY ABRANTES MURTA - BRASIL - SETEMBRO 2000
+--------------------------------------------------------------------------------
+
+INSTRUÇÕES
+==========
+
+Este programa desenha 77 curvas planas, algébricas ou trancedentais, e aceita, 
+para isso, três tipos de coordenadas: cartesianas, polares e paramétricas. Ao 
+final do texto, são apresentadas as 77 expressões em BASIC das curvas desenhadas
+pelo programa. Ao rodar o programa, ele imprime na tela a pergunta FORMULA?, 
+solicitando que se digite a equação da curva que se quer desenhar.
+
+O programa foi estruturado de forma a permitir a entrada de quatro formas 
+diferentes de equações:
+
+1) Y=(expressão)
+2) R=(expressão)
+3) R**2=(expressão)
+4) X=(expressão), seguido de Y=(expressão)
+
+A forma 1 corresponde à utilização de coordenadas cartesianas, com funções de 
+imagem y=f(x). As formas 2 e 3 pressupoem a utilização de coordenadas polares, 
+com funções de imagem r=f(t) e r²=f(t). A forma 4 induz à utilização de 
+coordenadas paramétricas com duas equações conjugadas de imagem x=f(t) e y=f(t).
+Neste caso, é preciso ter sempre o cuidado de digitar em primeiro lugar a 
+equação X=(expressão), e após, a equação y=(expressão).
+
+
+RESTRIÇÕES AO DOMÍNIO
+=====================
+
+Para se obter a representação gráfica de funções é sempre necessário estabelecer
+o intervalo do domínio dentro do qual desejamos a imagem geométrica. O programa 
+faz isso implicitamente, usando os parâmetros C e D para especificar, 
+respectivamente, os limites inferior e superior do intervalo, e atribuindo 
+automaticamente valores a C e D, que são os mais adequados à maioria das funções
+(observe na listagem do programa as linhas 140, 150, 500, 510, 1040 e 1050).
+
+Mas há casos em que esta especificação do intervalo precisa ser feita 
+explicitamente: para evitar paradas no micro provocadas por cálculos impossíveis
+ou para se obter melhor definição gráfica de certos trechos específicos da 
+função. Essa especificação explícita é feita ao final das equações da seguinte
+forma:
+
+Y=(expressão):C,D:
+R=(expressão):C,D:
+R**2=(expressão):C,D:
+
+A especificação do intervalo, no caso de coordenadas paramétricas, foi prevista
+no final da segunda equação conjugada, ou seja, Y=expressão:C,D:.
+
+Uma outra espécie de restrição ao domínio é feita nas linhas 200 e 590 da 
+listagem do programa, com o objetivo, neste caso, de estabelecer um equilíbrio 
+adequado entre escala horizontal versus escala vertical.
+
+Também procurou-se evitar, através das linhas 500 e 640 da listagem do programa,
+as paradas de processamento provocadas por divisões por zero e raiz quadrada de
+números negativos.
+
+
+--------------------------------------------------------------------------------
+                           EQUAÇÕES DAS CURVAS
+--------------------------------------------------------------------------------
+
+ 1) Função constante			33) Estrofóide
+    Y=5					    R=-3*COS (2*T)/(COS T)
+ 2) Função valor absoluto		34) Ofiuróide
+    Y=ABS X				    R=4*SIN T-(2*SIN T*SIN T/COS T):0,1:
+ 3) Função linear			35) Folium de Descartes
+    Y=X/3+2				    R=(6*SIN T*COS T)/(SIN T*SIN T*
+ 4) Circunferência			    SIN T+COS T*COS T*COS T)
+    R=6					36) Trissectriz de Maclaurin
+ 5) Elipse				    R=4*SIN (3*T)/SIN (2*T)
+    R=6/(2-SIN T)			37) Quadratriz de Hípias ou de 
+ 6) Parábola				    Dinôstrato
+    Y=X*X:-2,2:				    R=(2*T)/(PI*SIN T):-.2,.5:
+ 7) Função fracionária			38) Cruciforme
+    Y=1/(X*X):-3,3:			    R=2/SIN (2*T)
+ 8) Parábola cúbica			39) Curva de Gutschoven
+    Y=X*X*X:-1.5,1.5:			    R=1/TAN T
+ 9) Parábola semicúbica ou de Neil	40) Cúbica de Agnesi ou "versiera"
+    Y=(X*X)**(1/3)			    Y=8/(4+X*X):-5,5:
+10) Hipérbole				41) Bifolium
+    R=4/(2-3*COS T)			    R=5*SIN T*COS T*COS T
+11) Hipérbole equilátera		42) Lemniscata de Bernoulli
+    Y=1/X:-4,4:				    R**2=COS (2*T)
+12) Curva exponencial			43) Lemniscata
+    Y=1.3**X				    R**2=SIN (2*T)
+13) Curva logarítmica			44) Rosácea de 3 folhas
+    Y=LN X:.2,2:			    R=SIN (3*T)
+14) Curva de probabilidade ou de Gauss	45) Rosácea de 4 folhas
+    Y=EXP 1**(-X*X):-2,2:		    R=COS (2*T)
+15) Senóide				46) Rosácea de 5 folhas
+    Y=SIN X:-PI,PI:			    R=SIN (5*T)
+16) Co-senóide				47) Rosácea de 8 folhas
+    Y=COS X:-PI,PI:			    R=SIN (4*T)
+17) Tangentóide				48) Caracol de Pascal
+    Y=TAN X:-4.7,4.7:			    R=4*COS T+2
+18) Secantóide				49) Cardióide
+    Y=1/COS X:-4.7,4.7:			    R=4*COS T+4
+19) Inversa da senóide			50) Cocleóide
+    Y=ASN X:-1,1:			    R=3*SIN T/T:-2,2:
+20) Inversa da co-senóide		51) Nefróide de Freeth
+    Y=ACS X:-1,1:			    R=1+2*SIN (T/2):-2,2:
+21) Inversa da tangentóide		52) Nefróide de Proctor ou Epiciclóide
+    Y=ATN X				    de Huygens
+22) Ciclóide de cúspide na origem	    X=5*(3*COS T-COS (3*T))
+    X=T-SIN T				    Y=5*(3*SIN T-SIN (3*T))
+    Y=1-COS T:-2,2:			53) Curvas de Bowditch ou de Lissajous
+23) Ciclóide de vértice na origem	    a) X=SIN (3*T)	   Y=SIN T
+    X=T+SIN T				    b) X=SIN (T/2+PI/8)    Y=SIN T:0,4:
+    Y=1-COS T:-2,2:			    c) X=SIN (3/2*T)	   Y=SIN T
+24) Ciclóide alongada			    d) X=SIN (2*T)	   Y=SIN T
+    X=3*T-5*SIN T			    e) X=SIN (3*T+PI/2)    Y=SIN T
+    Y=3-5*COS T:-3,3:			    f) X=SIN (3*T+PI/4)    Y=SIN T
+25) Ciclóide encurtada			    g) X=SIN (T/2+PI/16)   Y=SIN T:0,4:
+    X=4*T-3*SIN T			54) Espiral de Arquimedes
+    Y=4-3*COS T:-3,3:			    R=T:0,3:
+26) Catenária				55) Espiral parabólica
+    Y=(EXP 1**X+EXP 1**-X)/2:-2,2:	    R**2=4*T:0,3:
+27) Epiciclóide de 4 cúspides		56) Espiral logarítmica
+    X=5*COS T-COS (5*T)			    R=EXP 1**(T/5):-5/10,3:
+    Y=5*SIN T-SIN (5*T)			57) Espiral hiperbólica ou recíproca
+28) Deltóide ou hipociclóide tricúspide	    R=2*PI/T:1/10,3:
+    X=2*COS T+COS (2*T)			58) Lituus
+    Y=2*SIN T-SIN (2*T)			    R**2=PI/T:1/10,4:
+29) Astróide ou hipociclóide de 	59) R=1/4+SIN T
+    4 cúspides				60) R=SIN (T/3):0,3:
+    X=COS T*COS T*COS T			61) R=1-LN T:1/10,4:
+    Y=SIN T*SIN T*SIN T			62) R=1-SIN (3/2*T)
+30) Evolvente da circunferência		63) R=SIN T*COS (2*T)
+    X=5*COS T+5*T*SIN T			64) R=SIN (2*T)-SIN T
+    Y=5*SIN T-5*T*COS T			65) R=SIN (2*T):-1/2,1/2:
+31) Concóide de reta ou de Nicodemes	66) R=SIN (4*T):-1/2,1/2:
+    R=(2/COS T)+3:-1.4,1.4:		67) R=2+COS (5*T)
+32) Cissóide de diocles			68) R=SIN (T/2):0,4:
+    R=2*TAN T*SIN T:0,1:		69) R=T*COS T:-2.5,2.5:
+					70) R=SIN (T*3/2):-.25,2.93:
+					71) R=SIN (1.5*T+PI/2):.25,1.77:
