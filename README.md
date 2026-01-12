@@ -55,6 +55,8 @@ Implementar um sistema que permita:
 ### ✅ Fase 6: Sistema de Plotagem (Completo)
 - **Parser de curvas**: Detecta automaticamente tipo (Y=, R=, R**2=, X=;Y=)
 - **Intervalos customizados**: Sintaxe `:C,D:` para definir domínio
+  - **Expressões no intervalo**: Suporte a `pi`, `e`, `-pi`, `-e`, `n*pi`, `n*e`, frações (`a/b`)
+  - **Sintaxe original ZX81**: `:1/10,2*pi:`, `:-pi,pi:`, `:0.1,3*pi:` funcionam nativamente
 - **Geração de amostras**: 80 pontos padrão com conversão de coordenadas
 - **Renderizadores**:
   - **CSV**: Saída tabular para análise externa
@@ -63,8 +65,16 @@ Implementar um sistema que permita:
     - Área de plotagem 80% (20% margem)
     - Eixos destacados em X=0, Y=0
     - Tics menores a cada 0.2 unidades
-- **Limites automáticos**: Bounding box dos dados
+    - **Filtragem de valores extremos**: MAX_COORD = 1e6 para singularidades
+- **Limites automáticos**: Bounding box dos dados com proteção contra valores infinitos
 - **CLI completo**: `./build/multicurvas <expr> [formato] [largura] [altura]`
+
+### ✅ Curvas Históricas ZX81 (77 Curvas)
+- **Script de geração**: `gerar_77_curvas.sh` recria todas as 77 curvas do programa original
+- **Sintaxe preservada**: `ln(x)`, `pi`, frações nos intervalos mantêm notação original
+- **Curvas complexas**: Trissectriz, Cruciforme, Lissajous com divisões por valores próximos a zero
+- **Tratamento de singularidades**: Filtragem automática de coordenadas extremas (>10^6)
+- **Diretório**: `originais/` contém todos os SVG das curvas históricas
 
 ## 🚀 Quick Start
 
@@ -104,6 +114,15 @@ make memtest
 # Intervalo customizado
 ./build/multicurvas "Y=sin(x):-3.14,3.14:" svg > seno.svg
 
+# Intervalo com expressões (sintaxe ZX81)
+./build/multicurvas "Y=sin(x):-pi,pi:" svg > seno_pi.svg
+
+# Curva polar com fração no intervalo
+./build/multicurvas "R=2*pi/t:1/10,3:" svg > espiral.svg
+
+# Curva com logaritmo natural
+./build/multicurvas "Y=ln(x):.2,2:" svg > logaritmo.svg
+
 # Curva paramétrica (Lissajous)
 ./build/multicurvas "X=sin(3*t);Y=sin(2*t)" svg > lissajous.svg
 
@@ -112,6 +131,9 @@ make memtest
 
 # Script com 10 exemplos
 ./gerar_testes.sh
+
+# Gerar todas as 77 curvas históricas do ZX81
+./gerar_77_curvas.sh
 ```
 
 **Testes do parser:**

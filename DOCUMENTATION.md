@@ -691,10 +691,18 @@ double resultado
 - [x] Comparação hardcoded vs parseado
 - [x] Análise de memória
 
-### Fase 6: Interface de Plotagem ⏳
-- [ ] Plotagem de gráficos 2D
-- [ ] Coordenadas retangulares, polares, paramétricas
-- [ ] Detecção de descontinuidades
+### Fase 6: Sistema de Plotagem ✅
+- [x] Parser de curvas com auto-detecção (Y=, R=, R**2=, X=;Y=)
+- [x] Intervalos customizados com sintaxe `:C,D:`
+- [x] **Parser de expressões em intervalos**: Suporte a `pi`, `e`, `-pi`, `-e`, `n*pi`, `n*e`, frações `a/b`
+- [x] **Token ln**: Adicionado `ln` como alias para `log` (logaritmo natural)
+- [x] Geração de 80 amostras com conversão de coordenadas
+- [x] Renderizador CSV para análise tabular
+- [x] Renderizador SVG com grid profissional
+- [x] **Filtragem de valores extremos**: MAX_COORD = 1e6 para proteção contra singularidades
+- [x] Bounding box automático com proteção contra infinitos
+- [x] CLI completo com canvas ajustável
+- [x] **77 curvas históricas do ZX81**: Script `gerar_77_curvas.sh` recria todas as curvas originais
 
 ---
 
@@ -788,6 +796,9 @@ typedef struct {
 **`Plot *plot_parse_text(const char *input, char **errmsg)`**
 - Parse de entrada: detecta tipo, extrai expressões e intervalo
 - Sintaxe de intervalo: `:C,D:` no final (ex: `"Y=x*x:-2,3:"`)
+- **Expressões em intervalos**: Suporte a `pi`, `e`, `-pi`, `-e`, `n*pi`, `n*e`, frações `a/b`
+  - Implementado via `eval_simple_expr()` que substitui `sscanf()`
+  - Exemplos: `":1/2,2*pi:"`, `":-pi,pi:"`, `":0.1,3*pi/2:"`
 - Retorna `Plot*` ou `NULL` com mensagem de erro
 
 **`PlotData *plot_generate_samples(const Plot *plot, char **errmsg)`**
@@ -824,13 +835,18 @@ typedef struct {
   - Linhas principais: cada 1.0 unidade (dados)
   - Tics menores: cada 0.2 unidades
   - Eixos destacados em X=0, Y=0
+- **Filtragem de valores extremos**:
+  - `#define MAX_COORD 1e6` - Limite para coordenadas válidas
+  - Proteção contra singularidades: ignora pontos com |x| ou |y| > 10^6
+  - Verifica `isfinite()` para evitar NaN/Inf
+  - Evita loops infinitos em grid quando curva tem valores extremos
 - **Cores configuráveis** (#defines):
   - `COLOR_BACKGROUND` - Fundo branco (#ffffff)
   - `COLOR_GRID_MAJOR` - Grid principal (#d0d0d0)
   - `COLOR_GRID_MINOR` - Tics menores (#e8e8e8)
   - `COLOR_AXES` - Eixos (#808080)
   - `COLOR_CURVE` - Curva (#0066cc)
-- **Limites automáticos**: Bounding box dos dados
+- **Limites automáticos**: Bounding box dos dados com filtragem
 
 ### `main.c`
 
@@ -877,6 +893,97 @@ typedef struct {
 
 **Notas:**
 - Prefixos case-insensitive (`y=`, `Y=`, `r=`, `R=`)
+
+### Sintaxe Original do ZX81 Preservada
+
+#### Parser de Intervalos com Expressões
+
+O sistema suporta a sintaxe original do ZX81 CURVAS nos intervalos, incluindo:
+
+- **Constantes**: `pi`, `e`, `-pi`, `-e`
+- **Expressões multiplicativas**: `2*pi`, `3*pi/2`, `5*e`
+- **Frações**: `1/2`, `1/10`, `3/4`
+- **Números decimais**: `0.1`, `3.14`, `-2.5`
+
+**Implementação**: Função `eval_simple_expr()` em [src/multicurvas_plot.c](src/multicurvas_plot.c#L23-L70)
+
+**Exemplos de intervalos válidos:**
+```
+Y=sin(x):-pi,pi:                # -π até π
+R=2*pi/t:1/10,3:                # 1/10 até 3
+Y=ln(x):1/2,e:                  # 1/2 até e
+R=4*sin(3*t)/sin(2*t):.1,3*pi/2: # 0.1 até 3π/2
+```
+
+#### Token ln (Logaritmo Natural)
+
+Adicionado suporte à função `ln` como alias para `log` (logaritmo natural).
+
+**Implementação**: [src/parser.c](src/parser.c#L129)
+```c
+CHECK_KEYWORD("ln", TOKEN_LOG);  // Após log10, antes de log
+```
+
+**Compatibilidade**: Ambas as sintaxes são válidas:
+- `ln(x)` - Sintaxe original ZX81
+- `log(x)` - Sintaxe moderna C
+
+#### Tratamento de Singularidades
+
+Curvas com divisões por valores próximos a zero (ex: `R=2/sin(2*t)`) podem gerar coordenadas extremas (±10^16).
+
+**Problema**: Grid com coordenadas extremas causa loops infinitos
+```c
+// Loop de renderização: y de -10^16 até 100
+for (int y = y_start; y <= y_end; y++) { ... }  // Infinito!
+```
+
+**Solução**: Filtragem em duas etapas em [src/render.c](src/render.c)
+
+1. **Bounding box** (linhas 31-49):
+   ```c
+   #define MAX_COORD 1e6
+   if (!isfinite(x) || fabs(x) > MAX_COORD) continue;
+   if (!isfinite(y) || fabs(y) > MAX_COORD) continue;
+   ```
+   - Ignora NaN e infinitos
+   - Filtra coordenadas com valor absoluto > 10^6
+   - Calcula limites apenas para pontos válidos
+
+2. **Renderização de curva** (linhas 161-173):
+   ```c
+   if (!isfinite(x) || !isfinite(y)) continue;
+   if (x < x_min || x > x_max || y < y_min || y > y_max) continue;
+   ```
+   - Pula pontos fora do bounding box
+   - Desenha apenas porções válidas da curva
+
+**Resultado**: Curvas com singularidades renderizam corretamente, mostrando apenas as partes matemáticas válidas.
+
+### Script de Geração das 77 Curvas Históricas
+
+**Arquivo**: [gerar_77_curvas.sh](gerar_77_curvas.sh)
+
+Script bash que recria todas as 77 curvas do programa original ZX81 CURVAS.
+
+**Características**:
+- 77 definições de curvas extraídas de `Referencia/Curvas.txt`
+- Sintaxe original preservada (pi, ln, frações nos intervalos)
+- Timeout de segurança em curvas com divisões
+- Saída em diretório `originais/`
+
+**Uso**:
+```bash
+./gerar_77_curvas.sh          # Gera todas as 77 curvas
+./gerar_77_curvas.sh > log    # Com log de progresso
+```
+
+**Curvas notáveis**:
+- Curva 36: Trissectriz `R=4*sin(3*t)/sin(2*t):.1,1.5:`
+- Curva 38: Cruciforme `R=2/sin(2*t):.1,1.5:`
+- Curvas 65-77: Variações de Lissajous paramétricas
+
+**Histórico**: Estas curvas eram computadas em um ZX81 de 8-bits com 1KB de RAM nos anos 80. Este projeto recria a funcionalidade completa em C moderno com arquitetura modular.
 - Polar: t em radianos (0.004π a 2π padrão)
 - R²: apenas valores não-negativos
 - Paramétrico: suporta `X=;Y=` ou `Y=;X=` (ordem automática)

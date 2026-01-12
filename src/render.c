@@ -29,20 +29,30 @@ void render_svg(const PlotData *data, const char *title, int canvas_w, int canva
     const double MARGIN_X = (CANVAS_W - PLOT_W) / 2.0;
     const double MARGIN_Y = (CANVAS_H - PLOT_H) / 2.0;
     
-    // Calcula bounding box dos dados
+    // Calcula bounding box dos dados (com limite para evitar valores extremos)
+    #define MAX_COORD 1e6  // Limite razoável para coordenadas
     double minx = data->x[0], maxx = data->x[0];
     double miny = data->y[0], maxy = data->y[0];
     for (int i = 1; i < data->count; i++) {
-        if (data->x[i] < minx) minx = data->x[i];
-        if (data->x[i] > maxx) maxx = data->x[i];
-        if (data->y[i] < miny) miny = data->y[i];
-        if (data->y[i] > maxy) maxy = data->y[i];
+        double x = data->x[i];
+        double y = data->y[i];
+        
+        // Ignora valores infinitos ou muito grandes (divisão por zero, etc)
+        if (!isfinite(x) || fabs(x) > MAX_COORD) continue;
+        if (!isfinite(y) || fabs(y) > MAX_COORD) continue;
+        
+        if (x < minx) minx = x;
+        if (x > maxx) maxx = x;
+        if (y < miny) miny = y;
+        if (y > maxy) maxy = y;
     }
     
     double rangex = maxx - minx;
     double rangey = maxy - miny;
     if (rangex < 0.01) rangex = 1.0;
     if (rangey < 0.01) rangey = 1.0;
+    
+    #undef MAX_COORD
     
     // Transformação afim: coordenadas de dados -> pixels
     // px = MARGIN_X + (x - minx) * PLOT_W / rangex
@@ -147,11 +157,18 @@ void render_svg(const PlotData *data, const char *title, int canvas_w, int canva
         printf("  </g>\n");
     }
     
-    // Curva
+    // Curva (filtra pontos com valores extremos)
     printf("  <polyline fill=\"none\" stroke=\"%s\" stroke-width=\"2\" points=\"", COLOR_CURVE);
     for (int i = 0; i < data->count; i++) {
-        double px = TO_PX(data->x[i]);
-        double py = TO_PY(data->y[i]);
+        double x = data->x[i];
+        double y = data->y[i];
+        
+        // Pula pontos com valores extremos
+        if (!isfinite(x) || !isfinite(y)) continue;
+        if (x < minx || x > maxx || y < miny || y > maxy) continue;
+        
+        double px = TO_PX(x);
+        double py = TO_PY(y);
         printf("%.2f,%.2f ", px, py);
     }
     printf("\"/>\n");

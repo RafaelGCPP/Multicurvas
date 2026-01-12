@@ -20,6 +20,74 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+/* Avalia uma expressão simples do intervalo (número, pi, -pi, frações, n*pi, etc.) */
+static int eval_simple_expr(const char *expr, double *result) {
+    char *endptr;
+    double val;
+    
+    // Remove espaços
+    while (*expr && isspace(*expr)) expr++;
+    if (!*expr) return 0;
+    
+    // Trata constantes especiais
+    if (strncmp(expr, "pi", 2) == 0 && !isalnum(expr[2])) {
+        *result = M_PI;
+        return 1;
+    }
+    if (strncmp(expr, "-pi", 3) == 0 && !isalnum(expr[3])) {
+        *result = -M_PI;
+        return 1;
+    }
+    if (strncmp(expr, "e", 1) == 0 && !isalnum(expr[1])) {
+        *result = M_E;
+        return 1;
+    }
+    if (strncmp(expr, "-e", 2) == 0 && !isalnum(expr[2])) {
+        *result = -M_E;
+        return 1;
+    }
+    
+    // Trata n*pi ou n*e
+    char *star = strchr(expr, '*');
+    if (star) {
+        double num = strtod(expr, &endptr);
+        if (endptr == star) {
+            const char *after = star + 1;
+            while (*after && isspace(*after)) after++;
+            if (strncmp(after, "pi", 2) == 0 && !isalnum(after[2])) {
+                *result = num * M_PI;
+                return 1;
+            }
+            if (strncmp(after, "e", 1) == 0 && !isalnum(after[1])) {
+                *result = num * M_E;
+                return 1;
+            }
+        }
+    }
+    
+    // Tenta número simples
+    val = strtod(expr, &endptr);
+    if (endptr != expr && (*endptr == '\0' || isspace(*endptr) || *endptr == ',' || *endptr == ':')) {
+        *result = val;
+        return 1;
+    }
+    
+    // Tenta fração simples (a/b)
+    char *slash = strchr(expr, '/');
+    if (slash) {
+        double num = strtod(expr, &endptr);
+        if (endptr == slash) {
+            double den = strtod(slash + 1, &endptr);
+            if (den != 0 && (*endptr == '\0' || isspace(*endptr) || *endptr == ',' || *endptr == ':')) {
+                *result = num / den;
+                return 1;
+            }
+        }
+    }
+    
+    return 0;
+}
+
 /* Extrai intervalo ":C,D:" do final. Retorna 1 se achou, 0 caso contrário. */
 static int parse_interval(char *buf, double *C, double *D) {
     // Procura o último ':' (finalizador do intervalo)
@@ -33,8 +101,24 @@ static int parse_interval(char *buf, double *C, double *D) {
     
     if (!anterior) return 0;
     
-    // Tenta fazer o parse ":valor,valor:" entre os dois ':'
-    if (sscanf(anterior, ":%lf,%lf:", C, D) == 2) {
+    // Extrai a substring do intervalo
+    char interval[128];
+    int len = ultimo - anterior - 1;
+    if (len <= 0 || len >= (int)sizeof(interval)) return 0;
+    
+    strncpy(interval, anterior + 1, len);
+    interval[len] = '\0';
+    
+    // Procura a vírgula separadora
+    char *comma = strchr(interval, ',');
+    if (!comma) return 0;
+    
+    *comma = '\0';  // Divide em duas strings
+    char *expr_c = interval;
+    char *expr_d = comma + 1;
+    
+    // Avalia as duas expressões
+    if (eval_simple_expr(expr_c, C) && eval_simple_expr(expr_d, D)) {
         // Trunca a string antes do intervalo
         *anterior = '\0';
         return 1;
