@@ -20,10 +20,14 @@ CORE_OBJECTS = $(patsubst $(SRCDIR)/%.c, $(BUILDDIR)/%.o, $(APP_CORE_SOURCES)) \
 # Executável principal
 MAIN_BIN = $(BUILDDIR)/multicurvas
 
+# abaco_test.c é o helper do test-runner da lib Abaco (não é uma suíte em si)
+ABACO_TEST_HELPER_OBJ = $(BUILDDIR)/abaco_test.o
+ABACO_TEST_SOURCES = $(filter-out $(ABACO_TESTDIR)/abaco_test.c, $(wildcard $(ABACO_TESTDIR)/*.c))
+
 # Testes (do app e da lib Abaco)
-TEST_SOURCES = $(wildcard $(TESTDIR)/*.c) $(wildcard $(ABACO_TESTDIR)/*.c)
+TEST_SOURCES = $(wildcard $(TESTDIR)/*.c) $(ABACO_TEST_SOURCES)
 TEST_BINS = $(patsubst $(TESTDIR)/%.c, $(BUILDDIR)/%.test, $(wildcard $(TESTDIR)/*.c)) \
-            $(patsubst $(ABACO_TESTDIR)/%.c, $(BUILDDIR)/%.test, $(wildcard $(ABACO_TESTDIR)/*.c))
+            $(patsubst $(ABACO_TESTDIR)/%.c, $(BUILDDIR)/%.test, $(ABACO_TEST_SOURCES))
 
 all: $(MAIN_BIN) tests
 
@@ -35,9 +39,12 @@ $(MAIN_BIN): $(BUILDDIR)/main.o $(CORE_OBJECTS) | $(BUILDDIR)
 $(BUILDDIR)/%.test: $(TESTDIR)/%.c $(CORE_OBJECTS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) $< $(CORE_OBJECTS) -o $@ $(LDFLAGS)
 
-# Compila testes da lib Abaco
-$(BUILDDIR)/%.test: $(ABACO_TESTDIR)/%.c $(CORE_OBJECTS) | $(BUILDDIR)
-	$(CC) $(CFLAGS) $< $(CORE_OBJECTS) -o $@ $(LDFLAGS)
+# Compila testes da lib Abaco (linkando o helper abaco_test.o)
+$(BUILDDIR)/%.test: $(ABACO_TESTDIR)/%.c $(CORE_OBJECTS) $(ABACO_TEST_HELPER_OBJ) | $(BUILDDIR)
+	$(CC) $(CFLAGS) $< $(CORE_OBJECTS) $(ABACO_TEST_HELPER_OBJ) -o $@ $(LDFLAGS)
+
+$(ABACO_TEST_HELPER_OBJ): $(ABACO_TESTDIR)/abaco_test.c $(ABACO_TESTDIR)/abaco_test.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -54,7 +61,12 @@ clean:
 tests: $(TEST_BINS)
 
 run-tests: tests
-	@for t in $(TEST_BINS); do echo "Executando $$t:"; $$t; done
+	@status=0; \
+	for t in $(TEST_BINS); do \
+		echo "Executando $$t:"; \
+		$$t || status=1; \
+	done; \
+	exit $$status
 
 help:
 	@echo "Targets disponíveis:"
