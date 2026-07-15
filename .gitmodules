@@ -1,0 +1,3 @@
+[submodule "lib/abaco"]
+	path = lib/abaco
+	url = https://github.com/realtico/Abaco.git
