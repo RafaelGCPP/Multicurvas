@@ -8,10 +8,11 @@
 #define _DEFAULT_SOURCE
 
 #include "../include/multicurvas_plot.h"
-#include "../include/parser.h"
-#include "../include/evaluator.h"
+#include "parser.h"
+#include "evaluator.h"
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
 #include <math.h>
 #include <ctype.h>
@@ -19,6 +20,26 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+/* Nomes de parâmetro aceitos como aliases entre si (x, theta, t). A biblioteca
+ * Abaco trata os três como variáveis independentes; a regra de negócio de que
+ * uma curva usa só UM desses nomes por vez é do Multicurvas, não da lib. */
+static const char *const MULTICURVAS_VARIABLES[] = { "x", "theta", "t" };
+#define MULTICURVAS_VARIABLE_COUNT 3
+
+/* Detecta se a expressão tokenizada referencia mais de um dos nomes de
+ * parâmetro (ex.: "x + theta"), o que o Multicurvas não permite. */
+static int usa_variaveis_misturadas(const TokenBuffer *tokens) {
+    int found = -1;
+    for (int i = 0; i < tokens->size; i++) {
+        if (tokens->tokens[i].type == TOKEN_VARIABLE) {
+            int idx = tokens->tokens[i].value_index;
+            if (found == -1) found = idx;
+            else if (found != idx) return 1;
+        }
+    }
+    return 0;
+}
 
 /* Avalia uma expressão simples do intervalo (número, pi, -pi, frações, n*pi, etc.) */
 static int eval_simple_expr(const char *expr, double *result) {
@@ -302,11 +323,14 @@ PlotData *plot_generate_samples(const Plot *plot, char **errmsg) {
     }
     
     // Compila expressão(ões)
+    AbacoContext ctx;
+    abaco_context_init(&ctx, MULTICURVAS_VARIABLES, MULTICURVAS_VARIABLE_COUNT);
+
     TokenBuffer tokens1, rpn1;
     parser_init_buffer(&tokens1);
     parser_init_buffer(&rpn1);
-    
-    ParserError perr = parser_tokenize(plot->expr1, &tokens1);
+
+    ParserError perr = parser_tokenize(&ctx, plot->expr1, &tokens1, NULL);
     if (perr != PARSER_OK) {
         if (errmsg) *errmsg = strdup("erro ao compilar primeira expressão");
         parser_free_buffer(&tokens1);
@@ -314,8 +338,16 @@ PlotData *plot_generate_samples(const Plot *plot, char **errmsg) {
         plot_data_free(data);
         return NULL;
     }
-    
-    perr = parser_to_rpn(&tokens1, &rpn1);
+
+    if (usa_variaveis_misturadas(&tokens1)) {
+        if (errmsg) *errmsg = strdup("não misture x, theta e t na mesma expressão");
+        parser_free_buffer(&tokens1);
+        parser_free_buffer(&rpn1);
+        plot_data_free(data);
+        return NULL;
+    }
+
+    perr = parser_to_rpn(&ctx, &tokens1, &rpn1);
     if (perr != PARSER_OK) {
         if (errmsg) *errmsg = strdup("erro ao converter primeira expressão para RPN");
         parser_free_buffer(&tokens1);
@@ -323,15 +355,15 @@ PlotData *plot_generate_samples(const Plot *plot, char **errmsg) {
         plot_data_free(data);
         return NULL;
     }
-    
+
     // Segunda expressão (paramétrico)
     TokenBuffer tokens2, rpn2;
     int tem_expr2 = (plot->type == PLOT_PARAMETRIC && plot->expr2);
     if (tem_expr2) {
         parser_init_buffer(&tokens2);
         parser_init_buffer(&rpn2);
-        
-        perr = parser_tokenize(plot->expr2, &tokens2);
+
+        perr = parser_tokenize(&ctx, plot->expr2, &tokens2, NULL);
         if (perr != PARSER_OK) {
             if (errmsg) *errmsg = strdup("erro ao compilar segunda expressão");
             parser_free_buffer(&tokens1);
@@ -341,8 +373,18 @@ PlotData *plot_generate_samples(const Plot *plot, char **errmsg) {
             plot_data_free(data);
             return NULL;
         }
-        
-        perr = parser_to_rpn(&tokens2, &rpn2);
+
+        if (usa_variaveis_misturadas(&tokens2)) {
+            if (errmsg) *errmsg = strdup("não misture x, theta e t na mesma expressão");
+            parser_free_buffer(&tokens1);
+            parser_free_buffer(&rpn1);
+            parser_free_buffer(&tokens2);
+            parser_free_buffer(&rpn2);
+            plot_data_free(data);
+            return NULL;
+        }
+
+        perr = parser_to_rpn(&ctx, &tokens2, &rpn2);
         if (perr != PARSER_OK) {
             if (errmsg) *errmsg = strdup("erro ao converter segunda expressão para RPN");
             parser_free_buffer(&tokens1);
@@ -360,8 +402,9 @@ PlotData *plot_generate_samples(const Plot *plot, char **errmsg) {
     
     for (int i = 0; i < n; i++) {
         double t = C + i * step;
-        EvalResult res1 = evaluator_eval_rpn(&rpn1, t);
-        
+        double var_values[MULTICURVAS_VARIABLE_COUNT] = { t, t, t }; /* x, theta, t são aliases do mesmo parâmetro */
+        EvalResult res1 = evaluator_eval_rpn(&ctx, &rpn1, var_values);
+
         if (res1.error != EVAL_OK) {
             data->status[i] = 1;
             continue;
@@ -389,7 +432,7 @@ PlotData *plot_generate_samples(const Plot *plot, char **errmsg) {
                 data->status[i] = 1;
                 continue;
             }
-            EvalResult res2 = evaluator_eval_rpn(&rpn2, t);
+            EvalResult res2 = evaluator_eval_rpn(&ctx, &rpn2, var_values);
             if (res2.error != EVAL_OK) {
                 data->status[i] = 1;
                 continue;

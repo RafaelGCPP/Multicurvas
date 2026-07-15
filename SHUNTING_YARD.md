@@ -149,10 +149,11 @@ Nota: O parser representa o `-` unário como `TOKEN_NEG`. Isso evita hacks como 
 ### Função Principal: `parser_to_rpn()`
 
 ```c
-ParserError parser_to_rpn(TokenBuffer *tokens, TokenBuffer *rpn);
+ParserError parser_to_rpn(const AbacoContext *ctx, TokenBuffer *tokens, TokenBuffer *rpn);
 ```
 
-Localização: [`src/parser.c`](../src/parser.c)
+Localização: [`lib/abaco/src/parser.c`](../lib/abaco/src/parser.c) — parte da biblioteca **Abaco**,
+extraída do Multicurvas para ser reaproveitável em outras aplicações (ver [`lib/abaco/`](../lib/abaco/)).
 
 ### Características Implementadas
 
