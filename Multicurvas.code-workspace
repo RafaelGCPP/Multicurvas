@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "Multicurvas",
+			"path": "."
+		},
+		{
+			"name": "Abaco",
+			"path": "lib/abaco"
+		}
+	],
+	"settings": {}
+}
